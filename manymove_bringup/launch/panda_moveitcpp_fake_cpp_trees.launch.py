@@ -42,6 +42,7 @@ from manymove_bringup.pipeline_utils import normalize_pipeline_config
 import yaml
 from moveit_configs_utils import MoveItConfigsBuilder
 
+loglevel = "info"
 
 def launch_setup(context, *args, **kwargs):
     """Configure launch actions for the panda moveitcpp fake cpp trees scenario."""
@@ -108,6 +109,7 @@ def launch_setup(context, *args, **kwargs):
                 'traj_controller': traj_controller,
             },
         ],
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     # RViz
@@ -133,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
         executable='static_transform_publisher',
         name='static_transform_publisher',
         output='log',
-        arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'world', 'panda_link0'],
+        arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'world', 'panda_link0', '--ros-args', '--log-level', loglevel],
     )
 
     # Publish TF
@@ -143,6 +145,7 @@ def launch_setup(context, *args, **kwargs):
         name='robot_state_publisher',
         output='both',
         parameters=[moveit_configs.robot_description],
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     # ros2_control using FakeSystem as hardware
@@ -156,6 +159,7 @@ def launch_setup(context, *args, **kwargs):
         executable='ros2_control_node',
         parameters=[moveit_configs.robot_description, ros2_controllers_path],
         output='both',
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     # Load controllers
@@ -184,6 +188,7 @@ def launch_setup(context, *args, **kwargs):
         name='object_manager_node',
         output='screen',
         parameters=[{'frame_id': 'world'}],
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     # ================================================================
@@ -202,6 +207,7 @@ def launch_setup(context, *args, **kwargs):
                 'robot_names': ['Franka_Emika_Panda'],
             }
         ],
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     # ================================================================
@@ -224,6 +230,7 @@ def launch_setup(context, *args, **kwargs):
                 'is_robot_real': False,
             }
         ],
+        arguments=['--ros-args', '--log-level', loglevel]  # silences INFO/WARN/DEBUG
     )
 
     return [

@@ -32,6 +32,14 @@
 
 #include <memory>
 #include <stdexcept>
+#include <cmath>
+
+#include <curlpp/cURLpp.hpp>
+#include <curlpp/Easy.hpp>
+#include <curlpp/Options.hpp>
+
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <geometry_msgs/msg/pose.hpp>
 
 #include "manymove_cpp_trees/hmi_utils.hpp"
 
@@ -1177,5 +1185,725 @@ void WaitForObjectAction::resultCallback(
   // We set result_received_ so onRunning() knows we can evaluate the outcome
   result_received_ = true;
 }
+
+SetClosestObjectKey::SetClosestObjectKey(
+    const std::string &name,
+    const BT::NodeConfiguration &config)
+    : BT::SyncActionNode(name, config)
+{
+}
+
+double poseDistance(const geometry_msgs::msg::Pose& a,
+                    const geometry_msgs::msg::Pose& b)
+{
+    tf2::Vector3 va(a.position.x, a.position.y, a.position.z);
+    tf2::Vector3 vb(b.position.x, b.position.y, b.position.z);
+    return (va - vb).length();
+}
+
+BT::NodeStatus SetClosestObjectKey::tick()
+{
+    auto bb = config().blackboard;
+
+    // get tcp pose
+	auto tcpPose = bb->get<geometry_msgs::msg::Pose>("dummy_tcp_pose_key");
+	std::cout << "Dummy TCP: " << std::endl;
+	std::cout << "X: " <<tcpPose.position.x << " Y: " << tcpPose.position.y << std::endl;
+
+    // get result key
+    std::string result_key;
+    getInput("result_key", result_key);
+
+	// search closest object
+	std::vector<std::string> object_keys_to_check;
+	double min_dist = INFINITY;
+	std::string min_dist_object = "";
+    if (getInput("object_keys_to_check", object_keys_to_check)) {
+        // std::cout << "CHECKED LINKS: " << std::endl;
+        for (const auto &k : object_keys_to_check) {
+			std::stringstream ss;
+			ss << k << "_pose_key";
+			auto pose = bb->get<geometry_msgs::msg::Pose>(ss.str());
+			pose.position.x = pose.position.x - 0.15;
+
+            double currentDistance = poseDistance(tcpPose, pose);
+            if (currentDistance < min_dist) {
+              min_dist = currentDistance;
+              min_dist_object = k;
+            }
+            // std::cout << k << " dist: " << currentDistance << std::endl;
+        }
+    }
+
+    // set result key
+    std::stringstream ss;
+    ss << "graspable_" << min_dist_object;
+    bb->set(result_key, ss.str());
+
+    return BT::NodeStatus::SUCCESS;
+}
+
+AlwaysPending::AlwaysPending(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+
+}
+
+BT::PortsList AlwaysPending::providedPorts()
+{
+    return {
+        BT::InputPort<bool>("resetRobotAction")
+    };
+}
+
+BT::NodeStatus AlwaysPending::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus AlwaysPending::onRunning()
+{
+	bool resetRobotAction;
+    if (!getInput("resetRobotAction", resetRobotAction))
+    {
+        throw BT::RuntimeError("Missing required input [resetRobotAction]");
+    }
+
+	auto bb = config().blackboard;
+    if (resetRobotAction) {
+		bb->set("robot_action", "Idle");
+		std::cout << "RESET ROBOT ACTION" << std::endl;
+		std::cout << "RESET ROBOT ACTION" << std::endl;
+		std::cout << "RESET ROBOT ACTION" << std::endl;
+    }else{
+		bb->set("error_drop_object_key_bool", false);
+		std::cout << "RESET error_drop_object_key_bool=false" << std::endl;
+	}
+    return BT::NodeStatus::RUNNING;
+}
+
+void AlwaysPending::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
+
+AddPotContentNode::AddPotContentNode(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+}
+
+BT::PortsList AddPotContentNode::providedPorts()
+{
+    return {};
+}
+
+BT::NodeStatus AddPotContentNode::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus AddPotContentNode::onRunning()
+{
+	auto bb = config().blackboard;
+	std::string toAdd = bb->get<std::string>("object_to_manipulate_key");
+	if (toAdd.empty()){
+		return BT::NodeStatus::SUCCESS;
+	}
+
+	toAdd.erase(0, 10); // remove "graspable_" prefix
+
+	std::string potContents = bb->get<std::string>("pot_contents");
+	std::stringstream ss;
+	ss << potContents;
+	char del = ',';
+	bool alreadyPresent = false;
+	std::string t;
+	while (getline(ss, t, del)){
+    	if (t == toAdd){
+			alreadyPresent = true;
+			break;
+		}
+	}
+	if (!alreadyPresent){
+		std::stringstream update;
+		update << potContents;
+		if(!potContents.empty())
+			update << ",";
+		update << toAdd;
+
+		bb->set("pot_contents", update.str());
+	}
+
+	return BT::NodeStatus::SUCCESS;
+}
+
+void AddPotContentNode::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
+
+
+BackendCommunicationNode::BackendCommunicationNode(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+	rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("bt_client_node");
+    marker_pub_ = node->create_publisher<visualization_msgs::msg::Marker>("/temp_marker", 10);
+	marker_array_pub = node->create_publisher<visualization_msgs::msg::MarkerArray>("/name_markers", 10);
+}
+
+BT::PortsList BackendCommunicationNode::providedPorts()
+{
+    return {};
+}
+
+
+BT::NodeStatus BackendCommunicationNode::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus BackendCommunicationNode::onRunning()
+{
+
+  auto bb = config().blackboard;
+
+  // speed for heating / cooling
+  double heat_speed = 10; // degree per second
+  double cool_speed = 5; // degree per second
+
+  // get delta time
+  auto now = std::chrono::steady_clock::now();
+  if (last_tick_time_ == std::chrono::steady_clock::time_point{}){
+	last_tick_time_ = now;
+  }
+  auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_tick_time_);
+  last_tick_time_ = now;
+
+  // update temperature
+  double heat_level = bb->get<double>("heat_level");
+  double temp = bb->get<double>("temperature");
+
+  double min_temp = 20;
+  double max_temp;
+  if (heat_level == 0){
+   	max_temp = min_temp;
+  }else{
+    max_temp = 120 + (heat_level - 1) * 30;
+  }
+
+  if (heat_level > 0){
+    temp += (heat_speed * dt.count()) / 1000.0;
+  }else{
+    temp -= (cool_speed * dt.count()) / 1000.0;
+  }
+  if (temp < min_temp){temp = min_temp;}
+  else if (temp > max_temp){temp = max_temp;}
+  else {bb->set("temperature", temp);}
+
+  // calculate temp marker color
+  float t = (temp - min_temp) / 220.0f;
+  t = std::clamp(t, 0.0f, 1.0f);
+  float minBrightness = 0.4f;
+  float r = minBrightness + t * (1.0f - minBrightness);
+  float g = 0.0f;
+  float b = minBrightness + (1.0f - t) * (1.0f - minBrightness);
+
+  // update temperature marker
+  std::stringstream marker_label;
+  marker_label << temp << "C";
+  if (heat_level > 0){
+    marker_label << " ON: " << heat_level;
+  }else{
+    marker_label << " OFF: " << heat_level;
+  }
+
+  visualization_msgs::msg::Marker marker;
+  marker.header.frame_id = "world";
+  marker.header.stamp = rclcpp::Clock().now();
+  marker.ns = "bt_marker";
+  marker.id = 0;
+  marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.pose.position.x = 0.1;
+  marker.pose.position.y = -0.4;
+  marker.pose.position.z = 0.1;
+  marker.scale.x = 0.05;
+  marker.scale.y = 0.05;
+  marker.scale.z = 0.05;
+  marker.color.r = r;
+  marker.color.g = g;
+  marker.color.b = b;
+  marker.color.a = 1.0;
+  marker.text = marker_label.str();
+  marker.lifetime.sec = 0; // 0 = forever
+
+  marker_pub_->publish(marker);
+
+  // send data from blackboard to backend
+  std::stringstream json_data;
+  std::stringstream json_updates;
+
+  // encountered error
+  std::string encountered_error = bb->get<std::string>("encountered_error");
+  std::stringstream encountered_error_json_update;
+  encountered_error_json_update << "{";
+  encountered_error_json_update << "\"objectName\": \"" << "Robot1" << "\"," << std::endl;
+  encountered_error_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	encountered_error_json_update << "{";
+	encountered_error_json_update << "\"attributePath\": \"\", ";
+	encountered_error_json_update << "\"attributeName\": \"EncounteredError\", ";
+	encountered_error_json_update << "\"attributeValue\": \"" << encountered_error << "\", ";
+	encountered_error_json_update << "\"attributeType\": \"String\"";
+    encountered_error_json_update << "}" << std::endl;
+
+  encountered_error_json_update << "]" << std::endl;
+  encountered_error_json_update << "}," << std::endl;
+  json_updates << encountered_error_json_update.str();
+
+  // current heat
+  std::stringstream pot_current_heat_json_update;
+  pot_current_heat_json_update << "{";
+  pot_current_heat_json_update << "\"objectName\": \"" << "pot" << "\"," << std::endl;
+  pot_current_heat_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	pot_current_heat_json_update << "{";
+	pot_current_heat_json_update << "\"attributePath\": \"\", ";
+	pot_current_heat_json_update << "\"attributeName\": \"Degree\", ";
+	pot_current_heat_json_update << "\"attributeValue\": \"" << temp << "\", ";
+	pot_current_heat_json_update << "\"attributeType\": \"Double\"";
+    pot_current_heat_json_update << "}" << std::endl;
+
+  pot_current_heat_json_update << "]" << std::endl;
+  pot_current_heat_json_update << "}," << std::endl;
+  json_updates << pot_current_heat_json_update.str();
+
+  // heat on / off
+  std::stringstream pot_heat_level_off_json_update;
+  pot_heat_level_off_json_update << "{";
+  pot_heat_level_off_json_update << "\"objectName\": \"" << "pot" << "\"," << std::endl;
+  pot_heat_level_off_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	pot_heat_level_off_json_update << "{";
+	pot_heat_level_off_json_update << "\"attributePath\": \"\", ";
+	pot_heat_level_off_json_update << "\"attributeName\": \"HeatLevel\", ";
+	pot_heat_level_off_json_update << "\"attributeValue\": \"" << heat_level << "\", ";
+	pot_heat_level_off_json_update << "\"attributeType\": \"Integer\"";
+    pot_heat_level_off_json_update << "}" << std::endl;
+
+  pot_heat_level_off_json_update << "]" << std::endl;
+  pot_heat_level_off_json_update << "}," << std::endl;
+  json_updates << pot_heat_level_off_json_update.str();
+
+  // contents of the pot
+  auto potContents = bb->get<std::string>("pot_contents");
+  std::stringstream pot_contents_json_update;
+  pot_contents_json_update << "{";
+  pot_contents_json_update << "\"objectName\": \"" << "pot" << "\"," << std::endl;
+  pot_contents_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	pot_contents_json_update << "{";
+	pot_contents_json_update << "\"attributePath\": \"\", ";
+	pot_contents_json_update << "\"attributeName\": \"Contents\", ";
+	pot_contents_json_update << "\"attributeValue\": \"" << potContents << "\", ";
+	pot_contents_json_update << "\"attributeType\": \"String\"";
+    pot_contents_json_update << "}" << std::endl;
+
+  pot_contents_json_update << "]" << std::endl;
+  pot_contents_json_update << "}," << std::endl;
+  json_updates << pot_contents_json_update.str();
+
+  // robot action currently active
+  auto robotAction = bb->get<std::string>("robot_action");
+  std::stringstream robot_action_json_update;
+  robot_action_json_update << "{";
+  robot_action_json_update << "\"objectName\": \"" << "Robot1" << "\"," << std::endl;
+  robot_action_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	robot_action_json_update << "{";
+	robot_action_json_update << "\"attributePath\": \"\", ";
+	robot_action_json_update << "\"attributeName\": \"CurrentAction\", ";
+	robot_action_json_update << "\"attributeValue\": \"" << robotAction << "\", ";
+	robot_action_json_update << "\"attributeType\": \"String\"";
+    robot_action_json_update << "}" << std::endl;
+
+  robot_action_json_update << "]" << std::endl;
+  robot_action_json_update << "}," << std::endl;
+  json_updates << robot_action_json_update.str();
+
+  // gripper open state
+  auto gripperOpen = bb->get<bool>("gripper_open");
+  std::stringstream gripper_json_update;
+  gripper_json_update << "{";
+  gripper_json_update << "\"objectName\": \"" << "Robot1" << "\"," << std::endl;
+  gripper_json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+	gripper_json_update << "{";
+	gripper_json_update << "\"attributePath\": \"Tcp\", ";
+	gripper_json_update << "\"attributeName\": \"GripperOpen\", ";
+	gripper_json_update << "\"attributeValue\": \"" << ((gripperOpen) ? ("true") : ("false")) << "\", ";
+	gripper_json_update << "\"attributeType\": \"Boolean\"";
+    gripper_json_update << "}" << std::endl;
+
+  gripper_json_update << "]" << std::endl;
+  gripper_json_update << "}," << std::endl;
+  json_updates << gripper_json_update.str();
+  // poses
+  std::vector<std::string> obj_with_pose_data = {
+	"GroundBeef", "Onions", "Garlic", "Oil", "BellPepper", "TomatoPaste",
+	"CannedTomatoes", "Canned_Kidney_Beans", "CannedCorn", "Broth", "Spices",
+	"dummy_tcp" // additional
+  };
+
+
+  visualization_msgs::msg::MarkerArray array_msg;
+  int id = 0;
+  for(auto it = obj_with_pose_data.begin(); it != obj_with_pose_data.end(); ++it){
+	id++;
+	auto obj_pd = *it;
+
+	std::stringstream pose_key_ss;
+	pose_key_ss << obj_pd << "_pose_key";
+	auto pose = bb->get<geometry_msgs::msg::Pose>(pose_key_ss.str());
+
+	// update name markers
+	if (obj_pd != "dummy_tcp"){
+	  visualization_msgs::msg::Marker name_marker;
+	  name_marker.header.frame_id = "world";
+	  name_marker.header.stamp = rclcpp::Clock().now();
+	  name_marker.ns = "bt_marker";
+	  name_marker.id = id;
+	  name_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+	  name_marker.action = visualization_msgs::msg::Marker::ADD;
+	  name_marker.pose.position.x = pose.position.x -0.075;
+	  name_marker.pose.position.y = pose.position.y;
+	  name_marker.pose.position.z = 0.05 + (id * 0.015);
+	  name_marker.scale.x = 0.025;
+	  name_marker.scale.y = 0.025;
+	  name_marker.scale.z = 0.025;
+	  name_marker.color.r = 1.0;
+	  name_marker.color.g = 1.0;
+	  name_marker.color.b = 1.0;
+	  name_marker.color.a = 1.0;
+	  name_marker.text = obj_pd;
+	  name_marker.lifetime.sec = 0; // 0 = forever
+      array_msg.markers.push_back(name_marker);
+	}
+
+
+
+	std::stringstream json_update;
+
+	std::string posPath = "PoseData.Location";
+	std::string rotPath = "PoseData.Rotation";
+
+	// special configuration for dummy tcp data
+	if (obj_pd == "dummy_tcp"){
+	  std::stringstream newPosPath;
+	  newPosPath << "Tcp." << posPath;
+	  posPath = newPosPath.str();
+	  std::stringstream newRotPath;
+	  newRotPath << "Tcp." << rotPath;
+	  rotPath = newRotPath.str();
+	  obj_pd = "Robot1";
+	}
+
+    json_update << "{";
+    json_update << "\"objectName\": \"" << obj_pd << "\"," << std::endl;
+    json_update << "\"sceneObjectAttributeUpdates\": [" << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << posPath << "\", ";
+		json_update << "\"attributeName\": \"X\", ";
+		json_update << "\"attributeValue\": \"" << pose.position.x << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << posPath << "\", ";
+		json_update << "\"attributeName\": \"Y\", ";
+		json_update << "\"attributeValue\": \"" << pose.position.y << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << posPath << "\", ";
+		json_update << "\"attributeName\": \"Z\", ";
+		json_update << "\"attributeValue\": \"" << pose.position.z << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << rotPath << "\", ";
+		json_update << "\"attributeName\": \"X\", ";
+		json_update << "\"attributeValue\": \"" << pose.orientation.x << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << rotPath << "\", ";
+		json_update << "\"attributeName\": \"Y\", ";
+		json_update << "\"attributeValue\": \"" << pose.orientation.y << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << rotPath << "\", ";
+		json_update << "\"attributeName\": \"Z\", ";
+		json_update << "\"attributeValue\": \"" << pose.orientation.z << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}," << std::endl;
+
+		json_update << "{";
+		json_update << "\"attributePath\": \"" << rotPath << "\", ";
+		json_update << "\"attributeName\": \"W\", ";
+		json_update << "\"attributeValue\": \"" << pose.orientation.w << "\", ";
+		json_update << "\"attributeType\": \"Double\"";
+        json_update << "}" << std::endl;
+
+	json_update << "]" << std::endl;
+	if(std::next(it) == obj_with_pose_data.end()) // last element
+    {
+        json_update << "}" << std::endl;
+    }else{
+		json_update << "}," << std::endl;
+	}
+
+    json_updates << json_update.str();
+  }
+  marker_array_pub->publish(array_msg); // send name marker array
+  json_data << "{\"sceneObjectUpdates\": [" << json_updates.str() << "]}" << std::endl;
+  //std::cout << "BACKEND COMM: " << json_data.str() << std::endl;
+
+
+  // send json data
+try
+{
+    curlpp::Cleanup cleanup;
+
+    curlpp::Easy request;
+
+    std::string url = "0.0.0.0:8080/update_scene";
+    std::string json_body = json_data.str();
+
+    // Set URL
+    request.setOpt(new curlpp::options::Url(url));
+
+    // JSON header
+    std::list<std::string> headers;
+    headers.push_back("Content-Type: application/json");
+    headers.push_back("Accept: application/json");
+    request.setOpt(new curlpp::options::HttpHeader(headers));
+
+    // Set POST and body
+    request.setOpt(new curlpp::options::PostFields(json_body));
+    request.setOpt(new curlpp::options::PostFieldSize(json_body.size()));
+
+    // Perform request
+    request.perform();
+
+    //std::cout << "JSON sent successfully." << std::endl;
+}
+catch (curlpp::LogicError &e)
+{
+    std::cerr << "LogicError: " << e.what() << std::endl;
+}
+catch (curlpp::RuntimeError &e)
+{
+    std::cerr << "RuntimeError: " << e.what() << std::endl;
+}
+
+  // send data
+  /*
+  curlpp::options::Url myUrl(std::string("http://example.com"));
+  curlpp::Easy myRequest;
+  myRequest.setOpt(myUrl);
+
+  myRequest.perform();
+
+
+  std::ostringstream os;
+  curlpp::options::WriteStream ws(&os);
+  myRequest.setOpt(ws);
+  myRequest.perform();
+
+  os << myRequest;
+
+  */
+
+  return BT::NodeStatus::RUNNING;
+}
+
+void BackendCommunicationNode::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
+SetKeyStringValue::SetKeyStringValue(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+}
+
+BT::PortsList SetKeyStringValue::providedPorts()
+{
+    return {
+        BT::InputPort<std::string>("key_to_write"),
+        BT::InputPort<std::string>("new_value")
+    };
+}
+
+BT::NodeStatus SetKeyStringValue::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus SetKeyStringValue::onRunning()
+{
+	std::string key;
+    std::string value;
+
+    if (!getInput<std::string>("key_to_write", key))
+    {
+        throw BT::RuntimeError("Missing input [key_to_write]");
+    }
+
+    if (!getInput<std::string>("new_value", value))
+    {
+        throw BT::RuntimeError("Missing input [new_value]");
+    }
+
+    // Write into the blackboard
+    config().blackboard->set<std::string>(key, value);
+
+    return BT::NodeStatus::SUCCESS;
+}
+
+void SetKeyStringValue::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
+void printPose(const geometry_msgs::msg::Pose &pose)
+{
+    std::cout << "Pose:\n"
+              << "  Position -> x: " << pose.position.x
+              << ", y: " << pose.position.y
+              << ", z: " << pose.position.z << "\n"
+              << "  Orientation -> x: " << pose.orientation.x
+              << ", y: " << pose.orientation.y
+              << ", z: " << pose.orientation.z
+              << ", w: " << pose.orientation.w << std::endl;
+}
+
+
+DropObject::DropObject(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+}
+
+BT::PortsList DropObject::providedPorts()
+{
+    return {};
+}
+
+BT::NodeStatus DropObject::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus DropObject::onRunning()
+{
+    auto bb = config().blackboard;
+
+	std::string obj_to_drop = bb->get<std::string>("object_to_manipulate_key");
+	if (obj_to_drop.empty()){
+		return BT::NodeStatus::SUCCESS;
+	}
+
+	bb->set("object_to_manipulate_key", ""); // remove currently manipulated object
+
+	obj_to_drop.erase(0, 10); // remove "graspable_" prefix
+
+	std::stringstream obj_pose_key;
+	obj_pose_key << obj_to_drop << "_pose_key";
+	// read pose, adjust z value, write back pose
+  	geometry_msgs::msg::Pose current_pose = bb->get<geometry_msgs::msg::Pose>(obj_pose_key.str());
+
+	// set z to floor
+    current_pose.position.z = 0.005;
+
+    // reset rotation
+    tf2::Quaternion q;
+    q.setRPY(0, 0, 0);
+    current_pose.orientation.x = q.x();
+    current_pose.orientation.y = q.y();
+    current_pose.orientation.z = q.z();
+    current_pose.orientation.w = q.w();
+
+	bb->set(obj_pose_key.str(), current_pose);
+
+	std::cout << "FINISHED Z VALUE UPDATE" << std::endl;
+
+    return BT::NodeStatus::SUCCESS;
+}
+
+void DropObject::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
+CheckObjectInPot::CheckObjectInPot(const std::string& name, const BT::NodeConfiguration& config)
+    : StatefulActionNode(name, config)
+{
+}
+
+BT::PortsList CheckObjectInPot::providedPorts()
+{
+    return {
+		BT::InputPort<std::string>("obj"),
+	};
+}
+
+BT::NodeStatus CheckObjectInPot::onStart()
+{
+    return BT::NodeStatus::RUNNING;
+}
+
+BT::NodeStatus CheckObjectInPot::onRunning()
+{
+    auto bb = config().blackboard;
+	bb->get<std::string>("pot_contents");
+
+	std::string obj;
+    if (!getInput<std::string>("obj", obj))
+    {
+        throw BT::RuntimeError("Missing input [obj]");
+    }
+
+	std::string potContents = bb->get<std::string>("pot_contents");
+	std::stringstream ss;
+	ss << potContents;
+	char del = ',';
+	bool alreadyPresent = false;
+	std::string t;
+	while (getline(ss, t, del)){
+    	if (t == obj){
+			alreadyPresent = true;
+			break;
+		}
+	}
+	if (alreadyPresent){
+		return BT::NodeStatus::SUCCESS;
+	}
+    return BT::NodeStatus::FAILURE;
+}
+
+void CheckObjectInPot::onHalted()
+{
+    // No cleanup needed, but required for proper reactive behavior
+}
+
 
 }  // namespace manymove_cpp_trees

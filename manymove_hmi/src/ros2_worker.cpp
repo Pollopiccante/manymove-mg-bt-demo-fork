@@ -281,3 +281,90 @@ void Ros2Worker::callResetProgram()
     RCLCPP_WARN(this->get_logger(), "callResetProgram() => service not available yet.");
   }
 }
+
+void Ros2Worker::callGripperCloseProgram()
+{
+  // Set both <prefix>stop_execution = true and <prefix>reset = true
+  auto request = std::make_shared<manymove_msgs::srv::SetBlackboardValues::Request>();
+
+  request->key.push_back("streamer_move_to_position_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  request->key.push_back("streamer_close_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("true");
+
+  request->key.push_back("streamer_open_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  auto future = update_blackboard_client_->async_send_request(request);
+  if (!update_blackboard_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "callGripperCloseProgram() => service not available yet.");
+  }
+}
+
+void Ros2Worker::callGripperOpenProgram()
+{
+  // Set both <prefix>stop_execution = true and <prefix>reset = true
+  auto request = std::make_shared<manymove_msgs::srv::SetBlackboardValues::Request>();
+
+  request->key.push_back("streamer_move_to_position_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  request->key.push_back("streamer_close_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  request->key.push_back("streamer_open_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("true");
+
+  auto future = update_blackboard_client_->async_send_request(request);
+  if (!update_blackboard_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "callGripperOpenProgram() => service not available yet.");
+  }
+}
+
+void Ros2Worker::callMoveToPositionProgram()
+{
+  // Set both <prefix>stop_execution = true and <prefix>reset = true
+  auto request = std::make_shared<manymove_msgs::srv::SetBlackboardValues::Request>();
+
+  request->key.push_back("approach_pick_target_key");
+  request->value_type.push_back("pose");
+  request->value_data.push_back("{\"x\":0.2,\"y\":0.3,\"z\":0.2,\"roll\":1.0,\"pitch\":0.0,\"yaw\":0.0}");
+
+  request->key.push_back("streamer_move_to_position_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("true");
+
+  request->key.push_back("streamer_close_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  request->key.push_back("streamer_open_gripper_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("false");
+
+  auto future = update_blackboard_client_->async_send_request(request);
+  if (!update_blackboard_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "callMoveToPositionProgram() => service not available yet.");
+  }
+}
+void Ros2Worker::callDropObjectProgram()
+{
+  // Set both <prefix>stop_execution = true and <prefix>reset = true
+  auto request = std::make_shared<manymove_msgs::srv::SetBlackboardValues::Request>();
+
+  request->key.push_back("error_drop_object_key_bool");
+  request->value_type.push_back("bool");
+  request->value_data.push_back("true");
+
+  auto future = update_blackboard_client_->async_send_request(request);
+  if (!update_blackboard_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "callDropObjectProgram() => service not available yet.");
+  }
+}

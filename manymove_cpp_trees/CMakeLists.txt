@@ -11,6 +11,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wthread-safety)
 endif()
 
+# Fix relocation warnings when statically linking curlpp
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 #--------------------------------------------------------------------
 # Dependencies
 #--------------------------------------------------------------------
@@ -33,6 +36,8 @@ find_package(topic_based_ros2_control REQUIRED)
 find_package(simulation_interfaces    REQUIRED)
 find_package(vision_msgs              REQUIRED)
 find_package(rcpputils                REQUIRED)
+find_package(CURL                     REQUIRED)
+find_package(visualization_msgs       REQUIRED)
 
 #--------------------------------------------------------------------
 # Library with all BT helper nodes
@@ -57,7 +62,13 @@ ament_target_dependencies(manymove_cpp_trees_lib
   rclcpp rclcpp_action behaviortree_cpp_v3
   manymove_planner manymove_object_manager
   trajectory_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs std_srvs manymove_msgs control_msgs
-  std_msgs topic_based_ros2_control simulation_interfaces vision_msgs rcpputils
+  std_msgs topic_based_ros2_control simulation_interfaces vision_msgs rcpputils visualization_msgs
+)
+
+# Link curlpp and curl into the library, so all executables get it
+target_link_libraries(manymove_cpp_trees_lib
+        curlpp
+        ${CURL_LIBRARIES}
 )
 
 #--------------------------------------------------------------------

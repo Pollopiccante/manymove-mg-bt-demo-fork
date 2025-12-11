@@ -234,6 +234,9 @@ BT::NodeStatus MoveManipulatorAction::onRunning()
         // stop the execution
         config().blackboard->set(robot_prefix_ + "stop_execution", true);
 
+        // Invalidate trajectory on stop
+        config().blackboard->set("trajectory_" + move_id_, trajectory_msgs::msg::JointTrajectory());
+
         // HMI message
         setHMIMessage(
           config().blackboard, robot_prefix_, "MOTION FAILED: " + action_result_.message, "red");

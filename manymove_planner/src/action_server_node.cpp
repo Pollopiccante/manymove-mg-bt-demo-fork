@@ -48,6 +48,7 @@ int main(int argc, char ** argv)
   // For multiple robots, e.g. "L_action_server_node" or "R_action_server_node".
   std::string node_name = node_prefix + "action_server_node";
   RCLCPP_INFO(loader_node->get_logger(), "Action Server Node name: %s", node_name.c_str());
+  rcutils_logging_set_logger_level("", 50);
 
   rclcpp::NodeOptions node_options;
   node_options.automatically_declare_parameters_from_overrides(true);

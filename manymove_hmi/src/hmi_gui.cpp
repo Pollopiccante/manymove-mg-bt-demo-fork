@@ -80,6 +80,30 @@ HmiGui::HmiGui(
     resetButton->setEnabled(true);
     rowLayout->addWidget(resetButton);
 
+    // GRIPPER CLOSE button
+    QPushButton * gripperCloseButton = new QPushButton("GRIPPER CLOSE", this);
+    gripperCloseButton->setObjectName("gripperCloseButton");
+    gripperCloseButton->setEnabled(true);
+    rowLayout->addWidget(gripperCloseButton);
+
+    // GRIPPER OPEN button
+    QPushButton * gripperOpenButton = new QPushButton("GRIPPER OPEN", this);
+    gripperOpenButton->setObjectName("gripperOpenButton");
+    gripperOpenButton->setEnabled(true);
+    rowLayout->addWidget(gripperOpenButton);
+
+    // MOVE TO POSITION button
+    QPushButton * moveToPositionButton = new QPushButton("MOVE TO", this);
+    moveToPositionButton->setObjectName("moveToPositionButton");
+    moveToPositionButton->setEnabled(true);
+    rowLayout->addWidget(moveToPositionButton);
+
+	// DROP OBJECT button
+    QPushButton * dropObjectButton = new QPushButton("DROP", this);
+    dropObjectButton->setObjectName("dropObjectButton");
+    dropObjectButton->setEnabled(true);
+    rowLayout->addWidget(dropObjectButton);
+
     // Add the row to the robot layout
     robotLayout->addLayout(rowLayout);
 
@@ -100,6 +124,10 @@ HmiGui::HmiGui(
     ri.startButton = startButton;
     ri.stopButton = stopButton;
     ri.resetButton = resetButton;
+    ri.gripperCloseButton = gripperCloseButton;
+    ri.gripperOpenButton = gripperOpenButton;
+    ri.moveToPositionButton = moveToPositionButton;
+    ri.dropObjectButton = dropObjectButton;
     ri.messageLabel = msgLbl;
     robotInterfaces_.push_back(ri);
 
@@ -115,6 +143,22 @@ HmiGui::HmiGui(
     connect(
       resetButton, &QPushButton::clicked, this, [this, prefix]() {
         emit resetProgramRequested(prefix);
+      });
+    connect(
+      gripperCloseButton, &QPushButton::clicked, this, [this, prefix]() {
+        emit gripperCloseProgramRequested(prefix);
+      });
+    connect(
+      gripperOpenButton, &QPushButton::clicked, this, [this, prefix]() {
+        emit gripperOpenProgramRequested(prefix);
+      });
+    connect(
+      moveToPositionButton, &QPushButton::clicked, this, [this, prefix]() {
+        emit moveToPositionProgramRequested(prefix);
+      });
+	connect(
+      dropObjectButton, &QPushButton::clicked, this, [this, prefix]() {
+        emit dropObjectProgramRequested(prefix);
       });
   }
 

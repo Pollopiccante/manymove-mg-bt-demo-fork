@@ -53,6 +53,10 @@ public:
   void callStartExecution();
   void callStopExecution();
   void callResetProgram();
+  void callGripperCloseProgram();
+  void callGripperOpenProgram();
+  void callMoveToPositionProgram();
+  void callDropObjectProgram();
 
   const std::string & getRobotPrefix() const {return robot_prefix_;}
 

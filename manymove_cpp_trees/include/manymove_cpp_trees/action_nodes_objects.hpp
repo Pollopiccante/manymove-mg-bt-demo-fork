@@ -52,6 +52,9 @@
 #include "manymove_msgs/action/get_input.hpp"
 #include "manymove_msgs/action/reset_robot_state.hpp"
 #include "manymove_msgs/action/set_output.hpp"
+#include <visualization_msgs/msg/marker.hpp>
+#include "visualization_msgs/msg/marker_array.hpp"
+#include <chrono>
 
 namespace manymove_cpp_trees
 {
@@ -471,6 +474,102 @@ private:
   bool last_exists_;
   bool last_is_attached_;
   std::string last_link_name_;
+};
+
+class SetClosestObjectKey : public BT::SyncActionNode
+{
+public:
+
+  SetClosestObjectKey(const std::string &name, const BT::NodeConfiguration &config);
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<std::vector<std::string>>("object_keys_to_check"),
+      BT::InputPort<std::string>("result_key"),
+    };
+  }
+  BT::NodeStatus tick() override;
+};
+
+class AlwaysPending : public BT::StatefulActionNode
+{
+public:
+  AlwaysPending(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
+};
+
+class BackendCommunicationNode : public BT::StatefulActionNode
+{
+public:
+  BackendCommunicationNode(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_array_pub;
+  std::chrono::steady_clock::time_point last_tick_time_;
+  void onHalted() override;
+};
+
+class AddPotContentNode : public BT::StatefulActionNode
+{
+public:
+  AddPotContentNode(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
+};
+
+class SetKeyStringValue : public BT::StatefulActionNode
+{
+public:
+  SetKeyStringValue(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
+};
+
+class DropObject : public BT::StatefulActionNode
+{
+public:
+  DropObject(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
+};
+
+class CheckObjectInPot : public BT::StatefulActionNode
+{
+public:
+  CheckObjectInPot(const std::string& name, const BT::NodeConfiguration& config);
+
+  static BT::PortsList providedPorts();
+
+private:
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
 };
 
 }  // namespace manymove_cpp_trees

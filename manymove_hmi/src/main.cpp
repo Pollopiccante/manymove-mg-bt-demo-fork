@@ -153,6 +153,30 @@ int main(int argc, char * argv[])
           worker->callResetProgram();
         }
       });
+    QObject::connect(
+      &gui, &HmiGui::gripperCloseProgramRequested, [worker](const std::string & p) {
+        if (worker->getRobotPrefix() == p) {
+          worker->callGripperCloseProgram();
+        }
+      });
+    QObject::connect(
+      &gui, &HmiGui::gripperOpenProgramRequested, [worker](const std::string & p) {
+        if (worker->getRobotPrefix() == p) {
+          worker->callGripperOpenProgram();
+        }
+      });
+    QObject::connect(
+      &gui, &HmiGui::moveToPositionProgramRequested, [worker](const std::string & p) {
+        if (worker->getRobotPrefix() == p) {
+          worker->callMoveToPositionProgram();
+        }
+      });
+    QObject::connect(
+      &gui, &HmiGui::dropObjectProgramRequested, [worker](const std::string & p) {
+        if (worker->getRobotPrefix() == p) {
+          worker->callDropObjectProgram();
+        }
+      });
   }
 
   // Spin each worker in its own thread.

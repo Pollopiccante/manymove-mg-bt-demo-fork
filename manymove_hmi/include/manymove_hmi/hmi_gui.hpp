@@ -67,6 +67,10 @@ signals:
   void startExecutionRequested(const std::string & robotPrefix);
   void stopExecutionRequested(const std::string & robotPrefix);
   void resetProgramRequested(const std::string & robotPrefix);
+  void gripperCloseProgramRequested(const std::string & robotPrefix);
+  void gripperOpenProgramRequested(const std::string & robotPrefix);
+  void moveToPositionProgramRequested(const std::string & robotPrefix);
+  void dropObjectProgramRequested(const std::string & robotPrefix);
 
 private:
   QWidget * centralWidget_;
@@ -81,6 +85,10 @@ private:
     QPushButton * startButton;
     QPushButton * stopButton;
     QPushButton * resetButton;
+    QPushButton * gripperCloseButton;
+    QPushButton * gripperOpenButton;
+    QPushButton * moveToPositionButton;
+    QPushButton * dropObjectButton;
     QLabel * messageLabel;
   };
 

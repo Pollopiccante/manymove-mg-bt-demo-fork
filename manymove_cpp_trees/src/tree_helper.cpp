@@ -144,6 +144,12 @@ ObjectSnippets createObjectSnippets(
 // Builder functions to build xml tree snippets programmatically
 // ----------------------------------------------------------------------------
 
+std::string buildConditionXML(const std::string bb_key, bool expected_value)
+{
+  std::ostringstream execution_cond;
+  execution_cond << "<CheckKeyBoolValue name=\"chk\" robot_prefix=\"hmi_\" key=\"" << bb_key << "\" value=\"" << expected_value << "\" hmi_message_logic=\"true\"/>";
+  return execution_cond.str();
+}
 std::string buildMoveXML(
   const std::string & robot_prefix, const std::string & node_prefix,
   const std::vector<Move> & moves, BT::Blackboard::Ptr blackboard, bool reset_trajs, int max_tries)
@@ -688,6 +694,26 @@ std::string reactiveWrapperXML(
   return xml.str();
 }
 
+std::string reactiveFBWrapperXML(
+  const std::string & fallback_name, const std::vector<std::string> & branches)
+{
+  std::ostringstream xml;
+  xml << "  <ReactiveFallback name=\"" << fallback_name << "\">\n";
+  for (auto & b : branches) {
+    xml << b << "\n";
+  }
+  xml << "  </ReactiveFallback>\n";
+  return xml.str();
+}
+
+std::string setClosestObjectKeyWrapper(const std::string & object_keys_to_check_key, const std::string & result_key){
+
+	std::ostringstream xml;
+	xml << "<SetClosestObjectKey name=\"{set_closest_for_" << result_key << "}\" object_keys_to_check=\"{" << object_keys_to_check_key << "}\" result_key=\"" << result_key << "\"/>\n";
+	return xml.str();
+}
+
+
 std::string repeatSequenceWrapperXML(
   const std::string & sequence_name, const std::vector<std::string> & branches,
   const int num_cycles)
@@ -723,14 +749,14 @@ std::string retrySequenceWrapperXML(
   const int num_cycles)
 {
   std::ostringstream xml;
-  xml << "  <RetryNode name=\""
+  xml << "  <RetryUntilSuccessful name=\""
       << "Retry_" << sequence_name << "\" num_attempts=\"" << num_cycles << "\">\n";
   xml << "    <Sequence name=\"" << sequence_name << "_sequence\">\n";
   for (const auto & b : branches) {
     xml << b << "\n";
   }
   xml << "    </Sequence>\n";
-  xml << "  </RetryNode>\n";
+  xml << "  </RetryUntilSuccessful>\n";
   return xml.str();
 }
 

@@ -90,6 +90,13 @@ inline void registerAllNodeTypes(BT::BehaviorTreeFactory & factory)
   factory.registerNodeType<GetEntityPoseNode>("GetEntityPoseNode");
 
   factory.registerNodeType<FoundationPoseAlignmentNode>("FoundationPoseAlignmentNode");
+  factory.registerNodeType<SetClosestObjectKey>("SetClosestObjectKey");
+  factory.registerNodeType<AlwaysPending>("AlwaysPending");
+  factory.registerNodeType<BackendCommunicationNode>("BackendCommunicationNode");
+  factory.registerNodeType<AddPotContentNode>("AddPotContentNode");
+  factory.registerNodeType<SetKeyStringValue>("SetKeyStringValue");
+  factory.registerNodeType<DropObject>("DropObject");
+  factory.registerNodeType<CheckObjectInPot>("CheckObjectInPot");
 }
 
 // --------------------------------------------------------------------------
@@ -162,6 +169,8 @@ std::string buildMoveXML(
   const std::string & robot_prefix, const std::string & node_prefix,
   const std::vector<Move> & moves, BT::Blackboard::Ptr blackboard, bool reset_trajs = false,
   int max_tries = 1);
+
+std::string buildConditionXML(const std::string bb_key, bool expected_value);
 
 /**
  * @brief Build a self-contained sequence that subscribes to FoundationPose, selects a detection,
@@ -465,6 +474,11 @@ std::string parallelWrapperXML(
  */
 std::string reactiveWrapperXML(
   const std::string & sequence_name, const std::vector<std::string> & branches);
+std::string reactiveFBWrapperXML(
+  const std::string & fallback_name, const std::vector<std::string> & branches);
+std::string setClosestObjectKeyWrapper(
+  const std::string & object_keys_to_check_key, const std::string & result_key);
+
 
 /**
  * @brief Wrap multiple snippets in a <RepeatNode> node with a given name.
