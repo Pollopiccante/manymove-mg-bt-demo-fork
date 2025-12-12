@@ -1207,8 +1207,6 @@ BT::NodeStatus SetClosestObjectKey::tick()
 
     // get tcp pose
 	auto tcpPose = bb->get<geometry_msgs::msg::Pose>("dummy_tcp_pose_key");
-	std::cout << "Dummy TCP: " << std::endl;
-	std::cout << "X: " <<tcpPose.position.x << " Y: " << tcpPose.position.y << std::endl;
 
     // get result key
     std::string result_key;
@@ -1219,7 +1217,6 @@ BT::NodeStatus SetClosestObjectKey::tick()
 	double min_dist = INFINITY;
 	std::string min_dist_object = "";
     if (getInput("object_keys_to_check", object_keys_to_check)) {
-        // std::cout << "CHECKED LINKS: " << std::endl;
         for (const auto &k : object_keys_to_check) {
 			std::stringstream ss;
 			ss << k << "_pose_key";
@@ -1231,7 +1228,6 @@ BT::NodeStatus SetClosestObjectKey::tick()
               min_dist = currentDistance;
               min_dist_object = k;
             }
-            // std::cout << k << " dist: " << currentDistance << std::endl;
         }
     }
 
@@ -1272,12 +1268,8 @@ BT::NodeStatus AlwaysPending::onRunning()
 	auto bb = config().blackboard;
     if (resetRobotAction) {
 		bb->set("robot_action", "Idle");
-		std::cout << "RESET ROBOT ACTION" << std::endl;
-		std::cout << "RESET ROBOT ACTION" << std::endl;
-		std::cout << "RESET ROBOT ACTION" << std::endl;
     }else{
 		bb->set("error_drop_object_key_bool", false);
-		std::cout << "RESET error_drop_object_key_bool=false" << std::endl;
 	}
     return BT::NodeStatus::RUNNING;
 }
@@ -1553,7 +1545,7 @@ BT::NodeStatus BackendCommunicationNode::onRunning()
   // poses
   std::vector<std::string> obj_with_pose_data = {
 	"GroundBeef", "Onions", "Garlic", "Oil", "BellPepper", "TomatoPaste",
-	"CannedTomatoes", "Canned_Kidney_Beans", "CannedCorn", "Broth", "Spices",
+	"CannedTomatoes", "CannedKidneyBeans", "CannedCorn", "Broth", "Spices",
 	"dummy_tcp" // additional
   };
 
@@ -1675,7 +1667,6 @@ BT::NodeStatus BackendCommunicationNode::onRunning()
   }
   marker_array_pub->publish(array_msg); // send name marker array
   json_data << "{\"sceneObjectUpdates\": [" << json_updates.str() << "]}" << std::endl;
-  //std::cout << "BACKEND COMM: " << json_data.str() << std::endl;
 
 
   // send json data
@@ -1703,8 +1694,6 @@ try
 
     // Perform request
     request.perform();
-
-    //std::cout << "JSON sent successfully." << std::endl;
 }
 catch (curlpp::LogicError &e)
 {
@@ -1783,18 +1772,6 @@ BT::NodeStatus SetKeyStringValue::onRunning()
 void SetKeyStringValue::onHalted()
 {
     // No cleanup needed, but required for proper reactive behavior
-}
-
-void printPose(const geometry_msgs::msg::Pose &pose)
-{
-    std::cout << "Pose:\n"
-              << "  Position -> x: " << pose.position.x
-              << ", y: " << pose.position.y
-              << ", z: " << pose.position.z << "\n"
-              << "  Orientation -> x: " << pose.orientation.x
-              << ", y: " << pose.orientation.y
-              << ", z: " << pose.orientation.z
-              << ", w: " << pose.orientation.w << std::endl;
 }
 
 

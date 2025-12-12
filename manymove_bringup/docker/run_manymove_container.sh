@@ -104,7 +104,7 @@ CONTAINER_USER="${USER:-manymove}"
 CONTAINER_UID="$(id -u)"
 CONTAINER_GID="$(id -g)"
 
-MANYMOVE_REPO_DEFAULT="https://github.com/pastoriomarco/manymove.git"
+MANYMOVE_REPO_DEFAULT="https://github.com/Pollopiccante/manymove-mg-bt-demo-fork"
 TARGET_COMMIT=""
 LABEL_COMMIT=""
 

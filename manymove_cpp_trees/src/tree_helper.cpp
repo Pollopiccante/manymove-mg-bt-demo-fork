@@ -191,7 +191,7 @@ std::string buildMoveXML(
     // This node is expected to either execute an existing trajectory or trigger a re–plan.
     execution_seq << "<RetryPauseResetNode name=\"StopSafe_Retry_" << this_move_id << "\""
                   << "  collision_detected=\"{" << robot_prefix << "collision_detected}\""
-                  << "  stop_execution=\"{" << robot_prefix << "stop_execution}\""
+                  << "  stop_execution=\"{" << robot_prefix << "my_stop_execution}\""
                   << "  reset=\"{" << robot_prefix << "reset}\""
                   << "  robot_prefix=\"" << robot_prefix << "\">\n"
                   << "  <Sequence>\n"
@@ -204,7 +204,7 @@ std::string buildMoveXML(
                   << "    pose_key=\"" << move.pose_key << "\""
                   << "    collision_detected=\"{" << robot_prefix << "collision_detected}\""
                   << "    invalidate_traj_on_exec=\"" << (reset_trajs ? "true" : "false") << "\" "
-                  << "    stop_execution=\"{" << robot_prefix << "stop_execution}\""
+                  << "    stop_execution=\"{" << robot_prefix << "my_stop_execution}\""
                   << "/>\n"
                   << "  </Sequence>\n"
                   << "</RetryPauseResetNode>\n";

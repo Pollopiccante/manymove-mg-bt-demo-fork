@@ -151,6 +151,7 @@ int main(int argc, char ** argv)
   // BlackBoard Initialization
   // ----------------------------------------------------------------------------
   blackboard->set("node", node);
+  blackboard->set("my_stop_execution", false);
   // the name of the link to attach the object to, and the object to manipulate
   std::string tcp_frame_name = rp.prefix + rp.tcp_frame;
   blackboard->set("tcp_frame_name_key", tcp_frame_name);
@@ -185,7 +186,7 @@ int main(int argc, char ** argv)
   // ----------------------------------------------------------------------------
   std::vector<std::string> ingredient_names = {
 	"GroundBeef", "Onions", "Garlic", "Oil", "BellPepper", "TomatoPaste",
-	 "CannedTomatoes", "Canned_Kidney_Beans", "CannedCorn", "Broth", "Spices"
+	 "CannedTomatoes", "CannedKidneyBeans", "CannedCorn", "Broth", "Spices"
   };
   blackboard->set("manipulation_objects_keys", ingredient_names); // objects to check when to gripper closes
 

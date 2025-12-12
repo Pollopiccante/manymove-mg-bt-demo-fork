@@ -42,7 +42,7 @@ from manymove_bringup.pipeline_utils import normalize_pipeline_config
 import yaml
 from moveit_configs_utils import MoveItConfigsBuilder
 
-loglevel = "info"
+loglevel = "fatal"
 
 def launch_setup(context, *args, **kwargs):
     """Configure launch actions for the panda moveitcpp fake cpp trees scenario."""
